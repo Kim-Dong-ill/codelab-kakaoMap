@@ -12,6 +12,7 @@ function Kakao() {
   const [message, setMessage] = useState(""); //지도 클릭시 위도 경도 메세지
   const [map, setMap] = useState(null); //카카오 map
   const [markers, setMarkers] = useState([]); //마커들 표시
+  const [currentOverlay, setCurrentOverlay] = useState(null); //오버레이 있으면 (overlay) 오버레이 없으면 null
   const [positions, setPositions] = useState([
     {
       title: "카카오",
@@ -49,23 +50,29 @@ function Kakao() {
 
       // map이 업데이트될 때마다 이벤트 리스너 추가
       kakao.maps.event.addListener(map, "click", function (position) {
-        //map 초기화
-        setMap(null);
+        //오버레이가 있을때 오버레이 지우기
+        if (currentOverlay) {
+          //오버레이 있으면~지우기
+          return currentOverlay.setMap(null);
+        } else {
+          //map 초기화
+          setMap(null);
 
-        console.log("지도 클릭event");
-        var latlng = position.latLng;
-        setMessage(
-          "클릭한 위치의 위도는 " +
-            latlng.getLat() +
-            " 이고, 경도는 " +
-            latlng.getLng() +
-            " 입니다"
-        );
-        updateMarkersCoords(latlng);
-        addMarker(position, map, imageSrc, imageSize, imageOption);
+          console.log("지도 클릭event");
+          var latlng = position.latLng;
+          setMessage(
+            "클릭한 위치의 위도는 " +
+              latlng.getLat() +
+              " 이고, 경도는 " +
+              latlng.getLng() +
+              " 입니다"
+          );
+          updateMarkersCoords(latlng);
+          addMarker(position, map, imageSrc, imageSize, imageOption);
+        }
       });
     }
-  }, [map, positions]); // map이 업데이트될 때만 useEffect 실행
+  }, [map, positions, currentOverlay]); // map이 업데이트될 때만 useEffect 실행
   // 나중에 수정사항 - 클릭시 기존 map이 초기화 되지만 약간 느리다.
   //useEffect end---------------------------------------------------------------------------useEffect end
 
@@ -136,98 +143,104 @@ function Kakao() {
     kakao.maps.event.addListener(marker, "click", function () {
       console.log("마커 클릭event");
 
-      //마커 클릭시 해당 마커로 중심좌표 이동
-      var mapContainer = document.getElementById("map"),
-        mapOption = {
-          center: new kakao.maps.LatLng(
-            marker.getPosition().Ma,
-            marker.getPosition().La
-          ), // 지도의 중심좌표
-          level: 5, // 지도의 확대 레벨
-          mapTypeId: kakao.maps.MapTypeId.ROADMAP, // 지도종류
-        };
-      const map = new kakao.maps.Map(mapContainer, mapOption);
-      setMap(map);
+      //오버레이가 있을때 오버레이 지우기
+      if (currentOverlay) {
+        return currentOverlay.setMap(null);
+      } else {
+        //마커 클릭시 해당 마커로 중심좌표 이동
+        var mapContainer = document.getElementById("map"),
+          mapOption = {
+            center: new kakao.maps.LatLng(
+              marker.getPosition().Ma,
+              marker.getPosition().La
+            ), // 지도의 중심좌표
+            level: 5, // 지도의 확대 레벨
+            mapTypeId: kakao.maps.MapTypeId.ROADMAP, // 지도종류
+          };
+        const map = new kakao.maps.Map(mapContainer, mapOption);
+        setMap(map);
 
-      var overlayContent = `
-            <div class="wrap">
-              <div class="info">
-                <div class="title">
-                  ${position.title}
-                  <button><div class="close" title="닫기"></div></button>
-                </div>
+        var overlayContent = `
+        <div class="wrap">
+        <div class="info">
+        <div class="title">
+        ${position.title}
+        <button><div class="close" title="닫기"></div></button>
+        </div>
                 <div class="body">
                   <div class="img">
-                    <img src="https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/thumnail.png" style={{width:"73px",height:"70px"}}>
+                  <img src="https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/thumnail.png" style={{width:"73px",height:"70px"}}>
                   </div>
                   <div class="desc">
-                    <div class="ellipsis">aaaaaaa 242</div>
-                    <div class="jibun ellipsis">(우) 63309 (지번) 영평동 2181</div>
-                    <div><a href="https://www.kakaocorp.com/main" class="link">홈페이지</a></div>
+                  <div class="ellipsis">aaaaaaa 242</div>
+                  <div class="jibun ellipsis">(우) 63309 (지번) 영평동 2181</div>
+                  <div><a href="https://www.kakaocorp.com/main" class="link">홈페이지</a></div>
                   </div>
-                </div>
-              </div>
-            </div>`;
+                  </div>
+                  </div>
+                  </div>`;
 
-      // 마커 위에 커스텀오버레이를 표시합니다
-      // 마커를 중심으로 커스텀 오버레이를 표시하기위해 CSS를 이용해 위치를 설정했습니다
-      var overlay = new kakao.maps.CustomOverlay({
-        content: overlayContent,
-        position: marker.getPosition(),
-      });
+        // 마커 위에 커스텀오버레이를 표시합니다
+        // 마커를 중심으로 커스텀 오버레이를 표시하기위해 CSS를 이용해 위치를 설정했습니다
+        var overlay = new kakao.maps.CustomOverlay({
+          content: overlayContent,
+          position: marker.getPosition(),
+        });
 
-      // overlayContent를 DOM 요소로 변환합니다.
-      var overlayElement = document.createElement("div");
-      overlayElement.innerHTML = overlayContent.trim();
+        // overlayContent를 DOM 요소로 변환합니다.
+        var overlayElement = document.createElement("div");
+        overlayElement.innerHTML = overlayContent.trim();
 
-      // 닫기 버튼을 선택합니다.
-      var closeButton = overlayElement.querySelector(".close");
-      console.log(closeButton);
+        // 닫기 버튼을 선택합니다.
+        var closeButton = overlayElement.querySelector(".close");
+        console.log(closeButton);
 
-      // 닫기 버튼에 클릭 이벤트를 추가합니다.
-      closeButton.addEventListener("click", function (event) {
-        console.log("closeBtn 클릭");
-        event.stopPropagation(); //지도 클릭 이벤트 전파되는걸 방지
-        closeOverlay(overlay);
-      });
-
-      // //커스텀 오버레이 닫기 함수
-      // function closeOverlay(overlay) {
-      //   console.log("오버레이 닫힘");
-      //   overlay.setMap(null); //이거 오버레이 닫기 기능 안됨 수정 필요
-      // }
-
-      // overlay에 클릭 이벤트를 추가하여 닫기 버튼을 클릭할 때 오버레이만 닫히도록 설정합니다.
-      kakao.maps.event.addListener(overlay, "click", function (event) {
-        console.log("오버레이 클릭event");
-        // 클릭한 요소가 닫기 버튼인 경우에만 오버레이를 닫음
-        if (event.target.classList.contains("close")) {
-          console.log("오버레이 닫기 클릭");
+        // 닫기 버튼에 클릭 이벤트를 추가합니다.
+        closeButton.addEventListener("click", function (event) {
+          console.log("closeBtn 클릭");
+          event.stopPropagation(); //지도 클릭 이벤트 전파되는걸 방지
           closeOverlay(overlay);
-        }
-      });
+        });
 
-      // 지도를 클릭했을 때 마커가 추가되는 것을 방지합니다.
-      const mapClickListener = function () {
-        console.log("지도 클릭으로 오버레이 닫기");
-        // 커스텀 오버레이가 열려있는 경우 닫기 함수를 호출합니다.
+        // //커스텀 오버레이 닫기 함수
+        // function closeOverlay(overlay) {
+        //   console.log("오버레이 닫힘");
+        //   overlay.setMap(null); //이거 오버레이 닫기 기능 안됨 수정 필요
+        // }
 
-        closeOverlay(overlay);
-      };
+        // overlay에 클릭 이벤트를 추가하여 닫기 버튼을 클릭할 때 오버레이만 닫히도록 설정합니다.
+        kakao.maps.event.addListener(overlay, "click", function (event) {
+          console.log("오버레이 클릭event");
+          // 클릭한 요소가 닫기 버튼인 경우에만 오버레이를 닫음
+          if (event.target.classList.contains("close")) {
+            console.log("오버레이 닫기 클릭");
+            closeOverlay(overlay);
+          }
+        });
 
-      // 커스텀 오버레이 닫기 함수에서 호출되므로 오버레이가 닫힌 후에 지도 클릭 이벤트 리스너를 다시 등록합니다.
-      kakao.maps.event.addListener(overlay, "close", function () {
-        console.log("오버레이가 닫혔습니다.");
-        // 지도 클릭 이벤트 리스너를 다시 등록합니다.
+        // 지도를 클릭했을 때 마커가 추가되는 것을 방지합니다.
+        const mapClickListener = function () {
+          console.log("지도 클릭으로 오버레이 닫기");
+          // 커스텀 오버레이가 열려있는 경우 닫기 함수를 호출합니다.
+
+          closeOverlay(overlay);
+        };
+
+        // 커스텀 오버레이 닫기 함수에서 호출되므로 오버레이가 닫힌 후에 지도 클릭 이벤트 리스너를 다시 등록합니다.
+        kakao.maps.event.addListener(overlay, "close", function () {
+          console.log("오버레이가 닫혔습니다.");
+          // 지도 클릭 이벤트 리스너를 다시 등록합니다.
+          kakao.maps.event.addListener(map, "click", mapClickListener);
+        });
+
+        // 기존에 등록된 클릭 이벤트 리스너를 삭제합니다.
+        kakao.maps.event.removeListener(map, "click", mapClickListener);
+        // 새로운 클릭 이벤트 리스너를 등록합니다.
         kakao.maps.event.addListener(map, "click", mapClickListener);
-      });
 
-      // 기존에 등록된 클릭 이벤트 리스너를 삭제합니다.
-      kakao.maps.event.removeListener(map, "click", mapClickListener);
-      // 새로운 클릭 이벤트 리스너를 등록합니다.
-      kakao.maps.event.addListener(map, "click", mapClickListener);
-
-      overlay.setMap(map);
+        overlay.setMap(map);
+        setCurrentOverlay(overlay); //CurrentOverlay를 overlay로 변경
+      }
     });
   };
   //addMarker end---------------------------------------------------------------------------addMarker end
@@ -236,6 +249,8 @@ function Kakao() {
   function closeOverlay(overlay) {
     console.log("오버레이 닫힘");
     overlay.setMap(null); //이거 오버레이 닫기 기능 안됨 수정 필요
+    setMap(null); //이거 오버레이 닫기 기능 안됨 수정 필요
+    setCurrentOverlay(null); //오버레이 null로 변경
   }
 
   //마커 보이기 클릭시
