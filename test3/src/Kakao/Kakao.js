@@ -19,16 +19,13 @@ var imageOption = { offset: new kakao.maps.Point(20, 42) }; // 마커이미지�
 
 //37.4800384,126.8842496 현재 위치
 
-var sw = new kakao.maps.LatLng(37.47429132916126, 126.87618670832752); //왼쪽 하단
-var ne = new kakao.maps.LatLng(37.485191149369, 126.89213381655398); //오른쪽 상단
-var lb = new kakao.maps.LatLngBounds(sw, ne);
+var currentPosition = []; //사용자의 현재 위치 좌표
 
 function Kakao() {
   const [message, setMessage] = useState(""); //지도 클릭시 위도 경도 메세지
   const [map, setMap] = useState(null); //카카오 map
   const [markers, setMarkers] = useState([]); //마커들 표시
   const [currentOverlay, setCurrentOverlay] = useState(null); //오버레이 있으면 (overlay) 오버레이 없으면 null
-  const [currentPosition, setCurrentPosition] = useState([]); //현재위치 저장
   const [positions, setPositions] = useState([
     {
       title: "카카오",
@@ -65,6 +62,20 @@ function Kakao() {
     if (!map) {
       mapscript(); //------------------------------------------------------------------------mapscript()
     } else {
+      //37.4800384,126.8842496 현재 위치
+      console.log(currentPosition.latitude);
+
+      //바운더리 설정
+      var sw = new kakao.maps.LatLng(
+        //- 0.007는 중심에서 멀어지는 값이다. 커질수록 범위 넓어짐
+        currentPosition.latitude - 0.007,
+        currentPosition.longitude - 0.007
+      ); //왼쪽 하단
+      var ne = new kakao.maps.LatLng(
+        currentPosition.latitude + 0.007,
+        currentPosition.longitude + 0.007
+      ); //오른쪽 상단
+      var lb = new kakao.maps.LatLngBounds(sw, ne);
       //map이 있으면~~
       //for문으로 기존 배열 지도에 마커찍기
       for (var i = 0; i < positions.length; i++) {
@@ -157,7 +168,7 @@ function Kakao() {
 
         // 위치 정보가 충분히 캐시되었으면, 이 프로퍼티를 설정하자,
         // 위치 정보를 강제로 재확인하기 위해 사용하기도 하는 이 값의 기본 값은 0이다.
-        maximumAge: 30000, // 5분이 지나기 전까지는 수정되지 않아도 됨
+        maximumAge: 0, // 30000 : 5분이 지나기 전까지는 수정되지 않아도 됨
 
         // 위치 정보를 받기 위해 얼마나 오랫동안 대기할 것인가?
         // 기본값은 Infinity이므로 getCurrentPosition()은 무한정 대기한다.
@@ -169,12 +180,13 @@ function Kakao() {
 
       //성공했을떄
       function success(position) {
+        currentPosition = position.coords;
         const time = new Date(position.timestamp); //시각
         var lat = position.coords.latitude; // 위도
         var lon = position.coords.longitude; // 경도
         console.log(`현재 위치는 : ${lat},${lon} `);
         console.log(`시간 : ${time} `);
-        console.log(position); //자세한 정보 들어있음,, 반경 구할때 필요할듯??
+        console.log(position.coords); //자세한 정보 들어있음,, 반경 구할때 필요할듯??
         var locPosition = new kakao.maps.LatLng(lat, lon), // 마커가 표시될 위치를 geolocation으로 얻어온 좌표로 생성합니다
           message = '<div style="padding:5px;">여기에 계신가요?!</div>'; // 인포윈도우에 표시될 내용입니다
         // 마커와 인포윈도우를 표시합니다
