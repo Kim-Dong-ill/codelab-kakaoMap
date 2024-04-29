@@ -2,37 +2,61 @@ import React, { useEffect, useState } from "react";
 
 const { kakao } = window;
 
-//선의 거리 계산하기
+// 1. 회원가입한 본인 주소 기준으로 근처(반경 계산) 해서 근처에 있는 강아지(다른 유저의 주소를 가지고)를 맵 상단에 띄운다. (화면 이동해도 변하지x)
+// 2. 본인 위치를 실시간으로 받아서 근처 (반경계산) 해서 근처의 약속 모임을 지도에 띄워진다. (리스트화 시킨다면 정렬 필요할듯? 정렬 기준 필요)
+// 3. 처음에 현재 위치의 시.도.군 을 가져와서 해당되는 기준에 대한 데이터만 가져오게 한다.
+
+//----추가할 필요가 있는 기능----
+//키워드로 장소검색하고 목록으로 표출하기
+//좌표로 주소를 얻어내기
+//주소로 장소 표시하기
+//마커 클러스터러 사용하기
+
 // 마커 이미지의 이미지 주소입니다
 var imageSrc = "./images/marker.svg";
 var imageSize = new kakao.maps.Size(40, 42);
 var imageOption = { offset: new kakao.maps.Point(20, 42) }; // 마커이미지의 옵션입니다. 마커의 좌표와 일치시킬 이미지 안에서의 좌표를 설정합니다.
+
+//37.4800384,126.8842496 현재 위치
+
+var sw = new kakao.maps.LatLng(37.47429132916126, 126.87618670832752); //왼쪽 하단
+var ne = new kakao.maps.LatLng(37.485191149369, 126.89213381655398); //오른쪽 상단
+var lb = new kakao.maps.LatLngBounds(sw, ne);
 
 function Kakao() {
   const [message, setMessage] = useState(""); //지도 클릭시 위도 경도 메세지
   const [map, setMap] = useState(null); //카카오 map
   const [markers, setMarkers] = useState([]); //마커들 표시
   const [currentOverlay, setCurrentOverlay] = useState(null); //오버레이 있으면 (overlay) 오버레이 없으면 null
+  const [currentPosition, setCurrentPosition] = useState([]); //현재위치 저장
   const [positions, setPositions] = useState([
     {
       title: "카카오",
-      latlng: new kakao.maps.LatLng(37.56827526221017, 126.9813458324624),
+      latlng: new kakao.maps.LatLng(37.479311460347, 126.8866702429908),
     },
     {
       title: "생태연못",
-      latlng: new kakao.maps.LatLng(37.56600410780766, 126.97763378892346),
+      latlng: new kakao.maps.LatLng(37.4761376343048, 126.8843235209789),
     },
     {
       title: "텃밭",
-      latlng: new kakao.maps.LatLng(37.56672599582368, 126.98442499820897),
+      latlng: new kakao.maps.LatLng(37.47941009051748, 126.87717317821058),
     },
     {
       title: "근린공원",
-      latlng: new kakao.maps.LatLng(37.56304937596438, 126.98066802641401),
+      latlng: new kakao.maps.LatLng(37.48622254460432, 126.87797612110123),
     },
     {
       title: "아무곳",
-      latlng: new kakao.maps.LatLng(37.562942148793745, 126.98723276638651),
+      latlng: new kakao.maps.LatLng(37.48587053082275, 126.88638897195683),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.48184075616303, 126.89363105403429),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.472827784332004, 126.89047846655862),
     },
   ]);
 
@@ -44,8 +68,14 @@ function Kakao() {
       //map이 있으면~~
       //for문으로 기존 배열 지도에 마커찍기
       for (var i = 0; i < positions.length; i++) {
-        console.log(positions[0].latlng);
-        addMarker(positions[i], map, imageSrc, imageSize, imageOption);
+        //근처에 있는지 없는지 (true / false)
+        let isBoundery = lb.contain(positions[i].latlng);
+        console.log(isBoundery);
+
+        //근처에 있다면 (true) 보여준다
+        if (isBoundery === true) {
+          addMarker(positions[i], map, imageSrc, imageSize, imageOption);
+        }
       }
 
       // map이 업데이트될 때마다 이벤트 리스너 추가
@@ -114,6 +144,78 @@ function Kakao() {
     // 확대 축소 컨트롤을 생성하고 지도의 우측에 추가
     var zoomControl = new kakao.maps.ZoomControl();
     map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+    //
+    //-------------------------------------------------------------------------------geolocation start
+    //
+    // HTML5의 geolocation으로 사용할 수 있는지 확인합니다
+    if (navigator.geolocation) {
+      const option = {
+        // 가능한 경우, 높은 정확도의 위치(예를 들어, GPS 등) 를 읽어오려면 true로 설정
+        // 그러나 이 기능은 배터리 지속 시간에 영향을 미친다.
+        enableHighAccuracy: false, // 대략적인 값이라도 상관 없음: 기본값
+
+        // 위치 정보가 충분히 캐시되었으면, 이 프로퍼티를 설정하자,
+        // 위치 정보를 강제로 재확인하기 위해 사용하기도 하는 이 값의 기본 값은 0이다.
+        maximumAge: 30000, // 5분이 지나기 전까지는 수정되지 않아도 됨
+
+        // 위치 정보를 받기 위해 얼마나 오랫동안 대기할 것인가?
+        // 기본값은 Infinity이므로 getCurrentPosition()은 무한정 대기한다.
+        timeout: 15000, // 15초 이상 기다리지 않는다.
+      };
+
+      // GeoLocation을 이용해서 접속 위치를 얻어옵니다
+      navigator.geolocation.watchPosition(success, error, option);
+
+      //성공했을떄
+      function success(position) {
+        const time = new Date(position.timestamp); //시각
+        var lat = position.coords.latitude; // 위도
+        var lon = position.coords.longitude; // 경도
+        console.log(`현재 위치는 : ${lat},${lon} `);
+        console.log(`시간 : ${time} `);
+        console.log(position); //자세한 정보 들어있음,, 반경 구할때 필요할듯??
+        var locPosition = new kakao.maps.LatLng(lat, lon), // 마커가 표시될 위치를 geolocation으로 얻어온 좌표로 생성합니다
+          message = '<div style="padding:5px;">여기에 계신가요?!</div>'; // 인포윈도우에 표시될 내용입니다
+        // 마커와 인포윈도우를 표시합니다
+        displayMarker(locPosition, message);
+      }
+
+      //실패했을때
+      function error(e) {
+        console.log("geolocation 오류" + e.code + ":" + e.message);
+      }
+    } else {
+      // HTML5의 GeoLocation을 사용할 수 없을때 마커 표시 위치와 인포윈도우 내용을 설정합니다
+      var locPosition = new kakao.maps.LatLng(33.450701, 126.570667),
+        message = "이 브라우저에서는 geolocation을 사용할수 없어요..";
+
+      displayMarker(locPosition, message);
+    }
+
+    // 지도에 마커와 인포윈도우를 표시하는 함수입니다
+    function displayMarker(locPosition, message) {
+      // 마커를 생성합니다
+      var marker = new kakao.maps.Marker({
+        map: map,
+        position: locPosition,
+      });
+
+      var iwContent = message, // 인포윈도우에 표시할 내용
+        iwRemoveable = true;
+
+      // 인포윈도우를 생성합니다
+      var infowindow = new kakao.maps.InfoWindow({
+        content: iwContent,
+        removable: iwRemoveable,
+      });
+
+      // 인포윈도우를 마커위에 표시합니다
+      infowindow.open(map, marker);
+
+      // 지도 중심좌표를 접속위치로 변경합니다
+      map.setCenter(locPosition);
+    } //-------------------------------------------------------------------------------geolocation end
   };
   //mapscript end---------------------------------------------------------------------------mapscript end
 
