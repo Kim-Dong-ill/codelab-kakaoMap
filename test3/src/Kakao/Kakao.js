@@ -17,8 +17,6 @@ var imageSrc = "./images/marker.svg";
 var imageSize = new kakao.maps.Size(40, 42);
 var imageOption = { offset: new kakao.maps.Point(20, 42) }; // 마커이미지의 옵션입니다. 마커의 좌표와 일치시킬 이미지 안에서의 좌표를 설정합니다.
 
-//37.4800384,126.8842496 현재 위치
-
 var currentPosition = []; //사용자의 현재 위치 좌표
 
 function Kakao() {
@@ -57,13 +55,82 @@ function Kakao() {
     },
   ]);
 
-  //useEffect start---------------------------------------------------------------------------useEffect start
+  //useEffect start-------------------------------------------------------------------------------useEffect start
   useEffect(() => {
     if (!map) {
-      mapscript(); //------------------------------------------------------------------------mapscript()
+      mapscript(); //-----------------------------------------------------------------------------mapscript()
     } else {
-      //37.4800384,126.8842496 현재 위치
-      console.log(currentPosition.latitude);
+      //------------------------------------------------------------------------------------------geolocation start
+      if (navigator.geolocation) {
+        const option = {
+          enableHighAccuracy: true,
+          // 대략적인 값이라도 상관 없음: 기본값
+          //true : 상세한 값 휴대폰 배터리 사용함
+
+          maximumAge: 0,
+          // 30000 : 5분이 지나기 전까지는 수정되지 않아도 됨
+
+          timeout: 30000, // 30초 이상 기다리지 않는다.
+        };
+
+        // GeoLocation을 이용해서 접속 위치를 얻어옵니다
+        navigator.geolocation.watchPosition(success, error, option);
+
+        //성공했을떄
+        function success(position) {
+          currentPosition = position.coords; //현재 좌표 저장
+          const time = new Date(position.timestamp); //시각 저장
+          const latlng = new kakao.maps.LatLng(
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          map.setCenter(latlng); // 사용자의 현재 위치를 지도의 중심 좌표로 설정
+          console.log("사용자의 현재 위치: ", latlng);
+          console.log(`시간 : ${time} `);
+
+          var locPosition = new kakao.maps.LatLng(latlng.Ma, latlng.La), // 마커가 표시될 위치를 geolocation으로 얻어온 좌표로 생성합니다
+            message = '<div style="padding:5px;">여기에 계신가요?!</div>'; // 인포윈도우에 표시될 내용입니다
+          // 마커와 인포윈도우를 표시합니다
+          displayMarker(locPosition, message);
+        }
+
+        //실패했을때
+        function error(error) {
+          console.log("geolocation 오류" + error.code + ":" + error.message);
+        }
+      } else {
+        // HTML5의 GeoLocation을 사용할 수 없을때 마커 표시 위치와 인포윈도우 내용을 설정합니다
+        var locPosition = new kakao.maps.LatLng(33.450701, 126.570667), //geolocation 실패했을때 기본좌표
+          message = "이 브라우저에서는 geolocation을 사용할수 없어요..";
+
+        // 마커와 인포윈도우를 표시합니다
+        displayMarker(locPosition, message);
+      }
+      //-------------------------------------------------------------------------------------------geolocation end
+
+      // 지도에 마커와 인포윈도우를 표시하는 함수입니다
+      function displayMarker(locPosition, message) {
+        // 마커를 생성합니다
+        var marker = new kakao.maps.Marker({
+          map: map,
+          position: locPosition,
+        });
+
+        var iwContent = message, // 인포윈도우에 표시할 내용
+          iwRemoveable = true;
+
+        // 인포윈도우를 생성합니다
+        var infowindow = new kakao.maps.InfoWindow({
+          content: iwContent,
+          removable: iwRemoveable,
+        });
+
+        // 인포윈도우를 마커위에 표시합니다
+        infowindow.open(map, marker);
+
+        // 지도 중심좌표를 접속위치로 변경합니다
+        map.setCenter(locPosition);
+      }
 
       //바운더리 설정
       var sw = new kakao.maps.LatLng(
@@ -113,9 +180,9 @@ function Kakao() {
         }
       });
     }
-  }, [map, positions, currentOverlay]); // map이 업데이트될 때만 useEffect 실행
+  }, [map, positions, currentOverlay]);
   // 나중에 수정사항 - 클릭시 기존 map이 초기화 되지만 약간 느리다.
-  //useEffect end---------------------------------------------------------------------------useEffect end
+  //useEffect end----------------------------------------------------------------------------------------useEffect end
 
   //클릭시 마커들의 위도 경도 저장 배열
   const updateMarkersCoords = (latlng) => {
@@ -130,11 +197,11 @@ function Kakao() {
 
   console.log(positions); // 복사한 배열 db에 저장 필요
 
-  //mapscript start---------------------------------------------------------------------------mapscript start
+  //mapscript start---------------------------------------------------------------------------------------mapscript start
   const mapscript = () => {
     var mapContainer = document.getElementById("map"),
       mapOption = {
-        center: new kakao.maps.LatLng(37.5648, 126.98119), // 지도의 중심좌표
+        center: new kakao.maps.LatLng(37.4800384, 126.8842496), // 지도의 중심좌표
         level: 5, // 지도의 확대 레벨
         mapTypeId: kakao.maps.MapTypeId.ROADMAP, // 지도종류
       };
@@ -155,85 +222,12 @@ function Kakao() {
     // 확대 축소 컨트롤을 생성하고 지도의 우측에 추가
     var zoomControl = new kakao.maps.ZoomControl();
     map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
-
-    //
-    //-------------------------------------------------------------------------------geolocation start
-    //
-    // HTML5의 geolocation으로 사용할 수 있는지 확인합니다
-    if (navigator.geolocation) {
-      const option = {
-        // 가능한 경우, 높은 정확도의 위치(예를 들어, GPS 등) 를 읽어오려면 true로 설정
-        // 그러나 이 기능은 배터리 지속 시간에 영향을 미친다.
-        enableHighAccuracy: false, // 대략적인 값이라도 상관 없음: 기본값
-
-        // 위치 정보가 충분히 캐시되었으면, 이 프로퍼티를 설정하자,
-        // 위치 정보를 강제로 재확인하기 위해 사용하기도 하는 이 값의 기본 값은 0이다.
-        maximumAge: 0, // 30000 : 5분이 지나기 전까지는 수정되지 않아도 됨
-
-        // 위치 정보를 받기 위해 얼마나 오랫동안 대기할 것인가?
-        // 기본값은 Infinity이므로 getCurrentPosition()은 무한정 대기한다.
-        timeout: 15000, // 15초 이상 기다리지 않는다.
-      };
-
-      // GeoLocation을 이용해서 접속 위치를 얻어옵니다
-      navigator.geolocation.watchPosition(success, error, option);
-
-      //성공했을떄
-      function success(position) {
-        currentPosition = position.coords;
-        const time = new Date(position.timestamp); //시각
-        var lat = position.coords.latitude; // 위도
-        var lon = position.coords.longitude; // 경도
-        console.log(`현재 위치는 : ${lat},${lon} `);
-        console.log(`시간 : ${time} `);
-        console.log(position.coords); //자세한 정보 들어있음,, 반경 구할때 필요할듯??
-        var locPosition = new kakao.maps.LatLng(lat, lon), // 마커가 표시될 위치를 geolocation으로 얻어온 좌표로 생성합니다
-          message = '<div style="padding:5px;">여기에 계신가요?!</div>'; // 인포윈도우에 표시될 내용입니다
-        // 마커와 인포윈도우를 표시합니다
-        displayMarker(locPosition, message);
-      }
-
-      //실패했을때
-      function error(e) {
-        console.log("geolocation 오류" + e.code + ":" + e.message);
-      }
-    } else {
-      // HTML5의 GeoLocation을 사용할 수 없을때 마커 표시 위치와 인포윈도우 내용을 설정합니다
-      var locPosition = new kakao.maps.LatLng(33.450701, 126.570667),
-        message = "이 브라우저에서는 geolocation을 사용할수 없어요..";
-
-      displayMarker(locPosition, message);
-    }
-
-    // 지도에 마커와 인포윈도우를 표시하는 함수입니다
-    function displayMarker(locPosition, message) {
-      // 마커를 생성합니다
-      var marker = new kakao.maps.Marker({
-        map: map,
-        position: locPosition,
-      });
-
-      var iwContent = message, // 인포윈도우에 표시할 내용
-        iwRemoveable = true;
-
-      // 인포윈도우를 생성합니다
-      var infowindow = new kakao.maps.InfoWindow({
-        content: iwContent,
-        removable: iwRemoveable,
-      });
-
-      // 인포윈도우를 마커위에 표시합니다
-      infowindow.open(map, marker);
-
-      // 지도 중심좌표를 접속위치로 변경합니다
-      map.setCenter(locPosition);
-    } //-------------------------------------------------------------------------------geolocation end
   };
-  //mapscript end---------------------------------------------------------------------------mapscript end
+  //mapscript end------------------------------------------------------------------------------------------mapscript end
 
   //
 
-  //addMarker start---------------------------------------------------------------------------addMarker start
+  //addMarker start----------------------------------------------------------------------------------------addMarker start
   const addMarker = (position, map, imageSrc, imageSize, imageOption) => {
     if (!map) return;
     console.log("마커 생성(addMarker)");
@@ -316,12 +310,6 @@ function Kakao() {
           closeOverlay(overlay);
         });
 
-        // //커스텀 오버레이 닫기 함수
-        // function closeOverlay(overlay) {
-        //   console.log("오버레이 닫힘");
-        //   overlay.setMap(null); //이거 오버레이 닫기 기능 안됨 수정 필요
-        // }
-
         // overlay에 클릭 이벤트를 추가하여 닫기 버튼을 클릭할 때 오버레이만 닫히도록 설정합니다.
         kakao.maps.event.addListener(overlay, "click", function (event) {
           console.log("오버레이 클릭event");
@@ -357,7 +345,7 @@ function Kakao() {
       }
     });
   };
-  //addMarker end---------------------------------------------------------------------------addMarker end
+  //addMarker end--------------------------------------------------------------------------------------addMarker end
 
   //커스텀 오버레이 닫기 함수
   function closeOverlay(overlay) {
