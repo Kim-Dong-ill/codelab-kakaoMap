@@ -2,16 +2,50 @@ import React, { useEffect, useState } from "react";
 
 const { kakao } = window;
 
+// 지도 로드
+
+// <geolocation가능할때>
+
+//    ->현재 위치좌표 가져와서 지도 중심으로 이동
+
+//    ->현재 위치기준 바운더리 설정해서 true인것만 지도에 보여주기
+
+//    ->마커 클릭시 해당 약속정보 간략하게 띄워주고 클릭 마커가 지도 중심으로 이동
+// 	-약속정보 닫기 누르면 "여기서 검색" 누를시에 이동된 좌표에서 검색
+// 	-<2안> 마커 클릭하면 지도 이동하지 않고 map 하단에 1개 리스트 약속정보 올라옴
+
+//    ->지도 중심좌표가 이동되었을때 "내 위치 보기" 버튼 생성해서 클릭시에만 현 위치 받아와서 뿌려줌
+
+//    ->지도 드래그 해서 중심좌표 변경되었을때 "여기서 검색" 버튼 생성해서 클릭시 해당 중심좌표 기준으로 바운더리 잡고 마커 생성
+
+//    ->
+
+// <geolocation불가능할때>
+
+//    ->절대 좌표 설정해서 해당 기본 좌표에 이동
+
+//    ->나머지 동일...
+
 // 1. 회원가입한 본인 주소 기준으로 근처(반경 계산) 해서 근처에 있는 강아지(다른 유저의 주소를 가지고)를 맵 상단에 띄운다. (화면 이동해도 변하지x)
 // 2. 본인 위치를 실시간으로 받아서 근처 (반경계산) 해서 근처의 약속 모임을 지도에 띄워진다. (리스트화 시킨다면 정렬 필요할듯? 정렬 기준 필요)
 // 3. 처음에 현재 위치의 시.도.군 을 가져와서 해당되는 기준에 대한 데이터만 가져오게 한다.
+// 4. 지도를 로드할때 모든 지도에 있는 마커를 다 가져오면 너무 느리다.
 
-//----추가할 필요가 있는 기능----
-//키워드로 장소검색하고 목록으로 표출하기
-//좌표로 주소를 얻어내기
-//주소로 장소 표시하기
-//마커 클러스터러 사용하기
+//----<추가할 필요가 있는 기능>----
+//키워드로 장소검색하고 목록으로 표출하기 --(하)
+//좌표로 주소를 얻어내기                --(최상)
+//주소로 장소 표시하기                  --(최상)
+//마커 클러스터러 사용하기              --(중)
 
+//----<수정할 필요가 있는 부분>----
+//마커 클릭시 순간 전체 마커들이 겹쳐지게 찍히고 사라짐 --> ( 마커 그림자 지우면 가능할듯 )
+//맨 처음 지도 로드될때나 새로고침할때 마커 안찍힘
+//커스텀 오버레이가 마커보다 우선순위가 낮음
+//지도를 클릭하여 마커가 나오면 현재위치마커는 사라짐 (둘다 동시에 나와야하게끔 수정 필요)
+
+//
+//------------------------------kakao map start----------------------------//
+//
 // 마커 이미지의 이미지 주소입니다
 var imageSrc = "./images/marker.svg";
 var imageSize = new kakao.maps.Size(40, 42);
@@ -24,6 +58,12 @@ function Kakao() {
   const [map, setMap] = useState(null); //카카오 map
   const [markers, setMarkers] = useState([]); //마커들 표시
   const [currentOverlay, setCurrentOverlay] = useState(null); //오버레이 있으면 (overlay) 오버레이 없으면 null
+
+  const [userLocation, setUserLocation] = useState(null); // 사용자의 현재 위치 좌표
+  const [dragMapCenter, setDragMapCenter] = useState(); //드래그시 맵 중심 좌표
+  const [isLocationAvailable, setLocationAvailable] = useState(false); // 사용자 위치가 사용 가능한지 여부
+  const [isBoundery, setIsBoundery] = useState(); //바운더리 안에 있는지 없는지
+
   const [positions, setPositions] = useState([
     {
       title: "카카오",
@@ -62,23 +102,25 @@ function Kakao() {
     } else {
       //------------------------------------------------------------------------------------------geolocation start
       if (navigator.geolocation) {
-        const option = {
-          enableHighAccuracy: true,
-          // 대략적인 값이라도 상관 없음: 기본값
-          //true : 상세한 값 휴대폰 배터리 사용함
+        // const option = {
+        //   enableHighAccuracy: true,
+        //   // 대략적인 값이라도 상관 없음: 기본값
+        //   //true : 상세한 값 휴대폰 배터리 사용함
 
-          maximumAge: 0,
-          // 30000 : 5분이 지나기 전까지는 수정되지 않아도 됨
+        //   maximumAge: 0,
+        //   // 30000 : 5분이 지나기 전까지는 수정되지 않아도 됨
 
-          timeout: 30000, // 30초 이상 기다리지 않는다.
-        };
+        //   timeout: 30000, // 30초 이상 기다리지 않는다.
+        // };
 
         // GeoLocation을 이용해서 접속 위치를 얻어옵니다
-        navigator.geolocation.watchPosition(success, error, option);
+        navigator.geolocation.getCurrentPosition(success, error);
 
         //성공했을떄
         function success(position) {
-          currentPosition = position.coords; //현재 좌표 저장
+          setUserLocation(position.coords); //현재 좌표 저장
+          setLocationAvailable(true); //위치사용 가능
+          // currentPosition = position.coords; //현재 좌표 저장
           const time = new Date(position.timestamp); //시각 저장
           const latlng = new kakao.maps.LatLng(
             position.coords.latitude,
@@ -96,6 +138,7 @@ function Kakao() {
 
         //실패했을때
         function error(error) {
+          setLocationAvailable(false); //위치 사용 불가
           console.log("geolocation 오류" + error.code + ":" + error.message);
         }
       } else {
@@ -107,6 +150,18 @@ function Kakao() {
         displayMarker(locPosition, message);
       }
       //-------------------------------------------------------------------------------------------geolocation end
+
+      //
+      //드래그 중심좌표 얻어오는 함수
+      kakao.maps.event.addListener(map, "dragend", function () {
+        // 지도 중심좌표를 얻어옵니다
+        var latlng = map.getCenter();
+        setDragMapCenter(map.getCenter());
+
+        var message = "변경된 지도 중심좌표는 " + latlng.getLat() + " 이고, ";
+        message += "경도는 " + latlng.getLng() + " 입니다";
+        setMessage(message);
+      });
 
       // 지도에 마커와 인포윈도우를 표시하는 함수입니다
       function displayMarker(locPosition, message) {
@@ -147,7 +202,8 @@ function Kakao() {
       //for문으로 기존 배열 지도에 마커찍기
       for (var i = 0; i < positions.length; i++) {
         //근처에 있는지 없는지 (true / false)
-        let isBoundery = lb.contain(positions[i].latlng);
+        let boundery = lb.contain(positions[i].latlng);
+        setIsBoundery(boundery);
         console.log(isBoundery);
 
         //근처에 있다면 (true) 보여준다
@@ -176,7 +232,10 @@ function Kakao() {
               " 입니다"
           );
           updateMarkersCoords(latlng);
-          addMarker(position, map, imageSrc, imageSize, imageOption);
+          if (isBoundery === true) {
+            console.log("지도 클릭 addMarker");
+            addMarker(position, map, imageSrc, imageSize, imageOption);
+          }
         }
       });
     }
@@ -184,8 +243,85 @@ function Kakao() {
   // 나중에 수정사항 - 클릭시 기존 map이 초기화 되지만 약간 느리다.
   //useEffect end----------------------------------------------------------------------------------------useEffect end
 
+  useEffect(() => {
+    //위치정보 사용가능하면
+    if (isLocationAvailable) {
+      initializeMap();
+    }
+  }, [isLocationAvailable]);
+
+  //초기 지도 생성
+  const initializeMap = () => {
+    var mapContainer = document.getElementById("map");
+    var mapOption = {
+      center: new kakao.maps.LatLng(
+        userLocation.latitude,
+        userLocation.longitude
+      ),
+      level: 5,
+      mapTypeId: kakao.maps.MapTypeId.ROADMAP,
+    };
+    const map = new kakao.maps.Map(mapContainer, mapOption);
+    setMap(map);
+
+    // 마우스 드래그와 모바일 터치를 이용한 지도 이동을 막음
+    // map.setDraggable(false);
+
+    // 마우스 휠과 모바일 터치를 이용한 지도 확대, 축소를 막음
+    map.setZoomable(false);
+
+    // 지도 타입 변경 컨트롤을 생성하고 지도의 상단 우측에 추가
+    var mapTypeControl = new kakao.maps.MapTypeControl();
+    map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
+
+    // 확대 축소 컨트롤을 생성하고 지도의 우측에 추가
+    var zoomControl = new kakao.maps.ZoomControl();
+    map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+    // 마커 초기화
+    initializeMarkers(map);
+  };
+
+  const initializeMarkers = (map) => {
+    //바운더리 설정
+    const bounds = new kakao.maps.LatLngBounds();
+    bounds.extend(
+      //중심값에서 바운더리 확장
+      new kakao.maps.LatLng(
+        userLocation.latitude - 0.007,
+        userLocation.longitude - 0.007
+      )
+    );
+    bounds.extend(
+      new kakao.maps.LatLng(
+        userLocation.latitude + 0.007,
+        userLocation.longitude + 0.007
+      )
+    );
+
+    const newMarkers = [];
+    //기존 마커 배열 지도에 표시
+    for (let i = 0; i < positions.length; i++) {
+      const latlng = positions[i].latlng;
+      //바운더리 안에 있다면 (true라면)
+      if (bounds.contain(latlng)) {
+        console.log(bounds.contain(latlng));
+        const marker = addMarker(
+          positions[i],
+          map,
+          imageSrc,
+          imageSize,
+          imageOption
+        );
+        newMarkers.push(marker);
+      }
+    }
+    setMarkers(newMarkers);
+  };
+
   //클릭시 마커들의 위도 경도 저장 배열
   const updateMarkersCoords = (latlng) => {
+    console.log("updateMarkersCoords");
     setPositions((prevCoords) => [
       ...prevCoords,
       {
@@ -269,24 +405,24 @@ function Kakao() {
         setMap(map);
 
         var overlayContent = `
-        <div class="wrap">
-        <div class="info">
-        <div class="title">
-        ${position.title}
-        <button><div class="close" title="닫기"></div></button>
-        </div>
-                <div class="body">
-                  <div class="img">
-                  <img src="https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/thumnail.png" style={{width:"73px",height:"70px"}}>
-                  </div>
-                  <div class="desc">
-                  <div class="ellipsis">aaaaaaa 242</div>
-                  <div class="jibun ellipsis">(우) 63309 (지번) 영평동 2181</div>
-                  <div><a href="https://www.kakaocorp.com/main" class="link">홈페이지</a></div>
-                  </div>
-                  </div>
-                  </div>
-                  </div>`;
+          <div class="wrap">
+          <div class="info">
+          <div class="title">
+          ${position.title}
+          <button><div class="close" title="닫기"></div></button>
+          </div>
+                  <div class="body">
+                    <div class="img">
+                    <img src="https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/thumnail.png" style={{width:"73px",height:"70px"}}>
+                    </div>
+                    <div class="desc">
+                    <div class="ellipsis">aaaaaaa 242</div>
+                    <div class="jibun ellipsis">(우) 63309 (지번) 영평동 2181</div>
+                    <div><a href="https://www.kakaocorp.com/main" class="link">홈페이지</a></div>
+                    </div>
+                    </div>
+                    </div>
+                    </div>`;
 
         // 마커 위에 커스텀오버레이를 표시합니다
         // 마커를 중심으로 커스텀 오버레이를 표시하기위해 CSS를 이용해 위치를 설정했습니다
