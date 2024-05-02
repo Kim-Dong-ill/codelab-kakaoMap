@@ -41,11 +41,18 @@ import React, { useEffect, useState } from "react";
 //커스텀 오버레이가 마커보다 우선순위가 낮음
 //지도를 클릭하여 마커가 나오면 현재위치마커는 사라짐 (둘다 동시에 나와야하게끔 수정 필요)(클릭시 마커 나오는거 삭제)
 
-//----------------------------------(2024-05-01 수정부분 추가)-----------------------
+//----------------------------------(2024-05-01 수정부분 추가)-----------------------//
 //마커 클릭시 다른 마커 전부 안보임 (마커 클릭시 오류가 다양하다)
 //드래그후 마커 클릭시 다른 오류
-//지도를 움직여 중앙좌표 변경후 "현 위치에서 검색"클릭시 마커 새로고침화
+//지도를 움직여 중앙좌표 변경후 "현 위치에서 검색"클릭시 마커 새로고침화(2024-05-02 수정완료)
 //지도 움직인 후 "내 위치 보기"로 geolocation 사용시 마커 변하지 않음
+//현위치로 마커찍는거는 맨 처음 지도 로드될때 찍고 "현위치"버튼 누르면 현위치로 이동하면서 마커 찍기
+//드래그후 마커찍는거는 드래그 하면 중심 좌표만 바뀌다가 "이 위치에서 검색" 클릭시 마커 찍히도록(2024-05-02 수정완료)
+//마커 보이기, 마커 감추기 수정 필요
+//내 위치 보기 계속 클릭시 내 위치 마커 중복 찍힘. (2024-05-02 수정완료)
+
+//----------------------------------(2024-05-02 수정부분 추가)-----------------------//
+//드래그시 현재위치 마커 사라지지 않음
 
 const { kakao } = window;
 //
@@ -62,8 +69,8 @@ function Kakao() {
   const [map, setMap] = useState(null); //카카오 map
   const [markers, setMarkers] = useState([]); //마커들 표시
   const [currentOverlay, setCurrentOverlay] = useState(null); //오버레이 있으면 (overlay) 오버레이 없으면 null
-
-  const [userLocation, setUserLocation] = useState(null); // 사용자의 현재 위치 좌표
+  const [currentLocationMarker, setCurrentLocationMarker] = useState(null); // 위치 정보 상태 변수 추가
+  const [userLocation, setUserLocation] = useState(null); //사용자의 현재 위치 좌표
   const [dragMapCenter, setDragMapCenter] = useState(); //드래그시 맵 중심 좌표
   const [isLocationAvailable, setLocationAvailable] = useState(false); // 사용자 위치가 사용 가능한지 여부
   const [isDrag, setIsDrag] = useState(false); //드래그
@@ -98,6 +105,30 @@ function Kakao() {
     {
       title: "아무곳",
       latlng: new kakao.maps.LatLng(37.472827784332004, 126.89047846655862),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.48839922696368, 126.89267194986982),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.47798819362497, 126.89788743524126),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.47198455870856, 126.8760096376654),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.46896653243736, 126.88528413136493),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.49268343334169, 126.88773559566658),
+    },
+    {
+      title: "아무곳",
+      latlng: new kakao.maps.LatLng(37.473483034315564, 126.89775790505735),
     },
   ]);
 
@@ -139,7 +170,7 @@ function Kakao() {
     setMarkers(newMarkers);
   };
 
-  //바운더리 설정
+  //바운더리 설정 (삭제 예정)
   // const setBoundery = (lat, lon) => {
   //   console.log("바운더리 기준좌표 :", lat, lon);
   //   var sw = new kakao.maps.LatLng(
@@ -231,9 +262,10 @@ function Kakao() {
   //드래그위치 가져오는 함수
   const getDragLocation = () => {
     console.log("드래그 위치 시작");
+
     //드래그 중심좌표 얻어오는 함수
     kakao.maps.event.addListener(map, "dragend", function () {
-      setIsDrag(true);
+      // setIsDrag(true);
       // 지도 중심좌표를 얻어옵니다
       var latlng = map.getCenter();
       setDragMapCenter(latlng);
@@ -263,6 +295,7 @@ function Kakao() {
   //
   //
 
+  //map, postions, currentOverlay 동작 useEffect
   useEffect(() => {
     if (!map) {
       mapscript();
@@ -275,15 +308,15 @@ function Kakao() {
     }
   }, [map, positions, currentOverlay]);
 
+  //위치정보 동작 useEffect
   useEffect(() => {
-    //위치정보 사용가능하면
     if (isLocationAvailable) {
       initializeMap();
     }
   }, [isLocationAvailable]);
 
+  //드래그 동작 useEffect
   useEffect(() => {
-    //드래그시
     if (isDrag) {
       initializeMap();
     }
@@ -291,6 +324,11 @@ function Kakao() {
 
   // 지도에 마커와 인포윈도우를 표시하는 함수입니다
   function displayMarker(locPosition, message) {
+    // 이전 마커가 있으면 제거
+    if (currentLocationMarker) {
+      currentLocationMarker.setMap(null);
+    }
+
     // 마커를 생성합니다
     var marker = new kakao.maps.Marker({
       map: map,
@@ -308,6 +346,9 @@ function Kakao() {
 
     // 인포윈도우를 마커위에 표시합니다
     infowindow.open(map, marker);
+
+    // 현재 마커를 상태 변수에 저장
+    setCurrentLocationMarker(marker);
 
     // 지도 중심좌표를 접속위치로 변경합니다
     map.setCenter(locPosition);
@@ -328,15 +369,15 @@ function Kakao() {
     // map.setDraggable(false);
 
     // 마우스 휠과 모바일 터치를 이용한 지도 확대, 축소를 막음
-    map.setZoomable(false);
+    // map.setZoomable(false);
 
     // 지도 타입 변경 컨트롤을 생성하고 지도의 상단 우측에 추가
-    var mapTypeControl = new kakao.maps.MapTypeControl();
-    map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
+    // var mapTypeControl = new kakao.maps.MapTypeControl();
+    // map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
 
     // 확대 축소 컨트롤을 생성하고 지도의 우측에 추가
-    var zoomControl = new kakao.maps.ZoomControl();
-    map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+    // var zoomControl = new kakao.maps.ZoomControl();
+    // map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
 
     // 마커 초기화
     // initializeMarkers(map);
@@ -345,6 +386,7 @@ function Kakao() {
 
   //위치정보 사용 가능하면 (true)
   const initializeMap = () => {
+    setMap(null);
     console.log("initializeMap : true");
     console.log(userLocation);
     var mapContainer = document.getElementById("map");
@@ -363,15 +405,15 @@ function Kakao() {
     // map.setDraggable(false);
 
     // 마우스 휠과 모바일 터치를 이용한 지도 확대, 축소를 막음
-    map.setZoomable(false);
+    // map.setZoomable(false);
 
     // 지도 타입 변경 컨트롤을 생성하고 지도의 상단 우측에 추가
-    var mapTypeControl = new kakao.maps.MapTypeControl();
-    map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
+    // var mapTypeControl = new kakao.maps.MapTypeControl();
+    // map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
 
     // 확대 축소 컨트롤을 생성하고 지도의 우측에 추가
-    var zoomControl = new kakao.maps.ZoomControl();
-    map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+    // var zoomControl = new kakao.maps.ZoomControl();
+    // map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
 
     // 마커 초기화
     initializeMarkers(map);
@@ -395,7 +437,10 @@ function Kakao() {
   };
 
   //현 위치에서 보기 클릭시
-  const dragLocation = () => {};
+  const dragLocation = () => {
+    setIsDrag(true);
+    document.querySelector(".dragTarget").style.display = "block";
+  };
 
   //addMarker
   const addMarker = (position, map, imageSrc, imageSize, imageOption) => {
@@ -523,6 +568,10 @@ function Kakao() {
     setMap(null); //이거 오버레이 닫기 기능 안됨 수정 필요
     setCurrentOverlay(null); //오버레이 null로 변경
   }
+
+  function test() {
+    alert("A");
+  }
   return (
     <>
       <div
@@ -530,13 +579,21 @@ function Kakao() {
         style={{ width: "500px", height: "80vh", position: "relative" }}
       >
         <div className="dragTarget">
-          <i class="fa-solid fa-location-dot"></i>
+          <i className="fa-solid fa-location-crosshairs"></i>
+        </div>
+        <div className="mapDogList">
+          <div onClick={test} className="mapDogListSlide"></div>
+          <div onClick={test} className="mapDogListSlide"></div>
+          <div onClick={test} className="mapDogListSlide"></div>
+          <div onClick={test} className="mapDogListSlide"></div>
+          <div onClick={test} className="mapDogListSlide"></div>
+          <div onClick={test} className="mapDogListSlide"></div>
         </div>
       </div>
       <div class="result">{message}</div>
       <p>
-        <button onClick={hideMarkers}>마커 감추기</button>
-        <button onClick={showMarkers}>마커 보이기</button>
+        {/* <button onClick={hideMarkers}>마커 감추기</button> */}
+        {/* <button onClick={showMarkers}>마커 보이기</button> */}
         <button onClick={myLocation}>내 위치 보기</button>
         <button onClick={dragLocation}>현 위치에서 검색</button>
       </p>

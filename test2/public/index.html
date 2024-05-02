@@ -19,16 +19,38 @@
     ></script>
 
     <style>
+      .mapDogList {
+        position: absolute;
+        z-index: 999999999;
+        width: 380px;
+        height: 70px;
+        background-color: rgb(255, 254, 251);
+        border-radius: 10px;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+      }
+      .mapDogListSlide {
+        border: 1px solid #000;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+      }
       .dragTarget {
         display: none;
-        font-size: 30px;
-        color: #2f8ce9;
+        font-size: 35px;
+        color: #ff4848;
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 99999999;
       }
+      /* 오버레이 */
       .wrap {
         position: absolute;
         z-index: 9999999;
