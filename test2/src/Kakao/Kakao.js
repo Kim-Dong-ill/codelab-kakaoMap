@@ -39,7 +39,7 @@ import React, { useEffect, useState } from "react";
 //마커 클릭시 순간 전체 마커들이 겹쳐지게 찍히고 사라짐 --> ( 마커 그림자 지우면 가능할듯 )
 //맨 처음 지도 로드될때나 새로고침할때 마커 안찍힘(2024-05-01 수정완료)
 //커스텀 오버레이가 마커보다 우선순위가 낮음
-//지도를 클릭하여 마커가 나오면 현재위치마커는 사라짐 (둘다 동시에 나와야하게끔 수정 필요)(클릭시 마커 나오는거 삭제)
+//지도를 클릭하여 마커가 나오면 현재위치마커는 사라짐 (둘다 동시에 나와야하게끔 수정 필요)(클릭시 마커 찍히는 기능 삭제 수정완료)
 
 //----------------------------------(2024-05-01 수정부분 추가)-----------------------//
 //마커 클릭시 다른 마커 전부 안보임 (마커 클릭시 오류가 다양하다)
@@ -53,6 +53,9 @@ import React, { useEffect, useState } from "react";
 
 //----------------------------------(2024-05-02 수정부분 추가)-----------------------//
 //드래그시 현재위치 마커 사라지지 않음
+
+//----------------------------------(2024-05-03 수정부분 추가)-----------------------//
+//내위치를 두번 클릭해야 현재 좌표에서 마커를 찍어준다.
 
 const { kakao } = window;
 //
@@ -74,7 +77,8 @@ function Kakao() {
   const [dragMapCenter, setDragMapCenter] = useState(); //드래그시 맵 중심 좌표
   const [isLocationAvailable, setLocationAvailable] = useState(false); // 사용자 위치가 사용 가능한지 여부
   const [isDrag, setIsDrag] = useState(false); //드래그
-  const [isBoundery, setIsBoundery] = useState(); //바운더리 안에 있는지 없는지
+  const [isGeolocaation, setIsGeolocation] = useState(false); //내위치
+  // const [isBoundery, setIsBoundery] = useState(); //바운더리 안에 있는지 없는지
 
   //초기 마커 배열
   const [positions, setPositions] = useState([
@@ -170,47 +174,10 @@ function Kakao() {
     setMarkers(newMarkers);
   };
 
-  //바운더리 설정 (삭제 예정)
-  // const setBoundery = (lat, lon) => {
-  //   console.log("바운더리 기준좌표 :", lat, lon);
-  //   var sw = new kakao.maps.LatLng(
-  //     //- 0.007는 중심에서 멀어지는 값이다. 커질수록 범위 넓어짐
-  //     lat - 0.007,
-  //     lon - 0.007
-  //   ); //왼쪽 하단
-  //   var ne = new kakao.maps.LatLng(lat + 0.007, lon + 0.007); //오른쪽 상단
-  //   var lb = new kakao.maps.LatLngBounds(sw, ne);
-  //   console.log(lb);
-  //   //map이 있으면~~
-  //   //for문으로 기존 배열 지도에 마커찍기
-  //   for (var i = 0; i < positions.length; i++) {
-  //     //근처에 있는지 없는지 (true / false)
-  //     let boundery = lb.contain(positions[i].latlng);
-  //     setIsBoundery(boundery);
-  //     console.log(isBoundery);
-
-  //     //근처에 있다면 (true) 보여준다
-  //     if (isBoundery === true) {
-  //       addMarker(positions[i], map, imageSrc, imageSize, imageOption);
-  //     }
-  //   }
-  // };
-
   //현재위치 가져오는 함수
   const getGeolocation = () => {
     console.log("geolocation 시작");
     if (navigator.geolocation) {
-      // const option = {
-      //   enableHighAccuracy: true,
-      //   // 대략적인 값이라도 상관 없음: 기본값
-      //   //true : 상세한 값 휴대폰 배터리 사용함
-
-      //   maximumAge: 0,
-      //   // 30000 : 5분이 지나기 전까지는 수정되지 않아도 됨
-
-      //   timeout: 30000, // 30초 이상 기다리지 않는다.
-      // };
-
       // GeoLocation을 이용해서 접속 위치를 얻어옵니다
       navigator.geolocation.getCurrentPosition(success, error);
 
@@ -237,10 +204,7 @@ function Kakao() {
 
         console.log(currentPosition);
 
-        //바운더리 설정
-        // setBoundery(currentPosition.latitude, currentPosition.longitude);
-        // initializeMarkers(map);
-
+        setIsGeolocation(false);
         displayMarker(locPosition, messageMarker);
       }
 
@@ -277,15 +241,30 @@ function Kakao() {
       message += "경도는 " + latlng.getLng() + " 입니다";
       setMessage(message);
 
-      //바운더리 설정
-      // setBoundery(currentPosition.Ma, currentPosition.La);
-      // initializeMarkers(map);
       document.querySelector(".dragTarget").style.display = "block";
     });
 
     setIsDrag(false);
   };
 
+  // getCurrentLocation 함수 정의
+  const getCurrentLocation = () => {
+    console.log("getCurrentLocation 시작");
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(success, error);
+
+      function success(position) {
+        setUserLocation(position.coords); // 사용자의 현재 위치 좌표 상태 업데이트
+        console.log("사용자의 현재 위치: ", position.coords);
+      }
+
+      function error(error) {
+        console.log("geolocation 오류" + error.code + ":" + error.message);
+      }
+    } else {
+      console.log("geolocation 사용 불가능");
+    }
+  };
   //
   //
   //
@@ -308,19 +287,19 @@ function Kakao() {
     }
   }, [map, positions, currentOverlay]);
 
-  //위치정보 동작 useEffect
+  //위치정보 동작, 드래그 동작, 내위치 클릭 useEffect
   useEffect(() => {
-    if (isLocationAvailable) {
-      initializeMap();
+    if (isLocationAvailable || isDrag || isGeolocaation) {
+      initializeMap(); // 위치 정보 사용 가능할 때마다 지도 초기화
     }
-  }, [isLocationAvailable]);
+  }, [isLocationAvailable, isDrag, isGeolocaation]);
 
-  //드래그 동작 useEffect
-  useEffect(() => {
-    if (isDrag) {
-      initializeMap();
-    }
-  }, [isDrag]);
+  // getCurrentLocation 함수 호출 추가
+  // useEffect(() => {
+  //   if (isLocationAvailable || isGeolocaation) {
+  //     getCurrentLocation(); // 위치 정보 사용 가능할 때마다 현재 위치 가져오기
+  //   }
+  // }, [isLocationAvailable, isGeolocaation]);
 
   // 지도에 마커와 인포윈도우를 표시하는 함수입니다
   function displayMarker(locPosition, message) {
@@ -401,15 +380,8 @@ function Kakao() {
     const map = new kakao.maps.Map(mapContainer, mapOption);
     setMap(map);
 
-    // 마우스 드래그와 모바일 터치를 이용한 지도 이동을 막음
-    // map.setDraggable(false);
-
     // 마우스 휠과 모바일 터치를 이용한 지도 확대, 축소를 막음
     // map.setZoomable(false);
-
-    // 지도 타입 변경 컨트롤을 생성하고 지도의 상단 우측에 추가
-    // var mapTypeControl = new kakao.maps.MapTypeControl();
-    // map.addControl(mapTypeControl, kakao.maps.ControlPosition.TOPRIGHT);
 
     // 확대 축소 컨트롤을 생성하고 지도의 우측에 추가
     // var zoomControl = new kakao.maps.ZoomControl();
@@ -431,14 +403,18 @@ function Kakao() {
 
   //내 위치 보기 클릭시
   const myLocation = () => {
+    console.log("내위치보기 클릭");
     document.querySelector(".dragTarget").style.display = "none";
+    setIsGeolocation(true);
     setIsDrag(false);
-    getGeolocation();
+    getCurrentLocation(); // getCurrentLocation 함수 호출
+    // getGeolocation();
   };
 
   //현 위치에서 보기 클릭시
   const dragLocation = () => {
     setIsDrag(true);
+    setIsGeolocation(false);
     document.querySelector(".dragTarget").style.display = "block";
   };
 
